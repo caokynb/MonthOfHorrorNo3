@@ -11,7 +11,7 @@ https://itch.io/jam/month-of-horror-3
 * **Engine & Môi trường:** Unity 3D (6000.5.8f1) URP
 * **Nền tảng:** PC (Windows)
 * **Thể loại:** 2.5D Top-Down Psychological Horror / Marine Exploration
-* **Góc nhìn:** Top-Down 2.5D (Camera 3D nhìn nghiêng từ trên xuống, mặt nước/môi trường 3D, nhân vật/quái vật/vật thể là 2D Sprite Billboarding)
+* **Góc nhìn & Cách Render:** Top-Down 2.5D phong cách **Don't Starve Together** (Môi trường, mặt biển và địa hình là 3D; nhân vật, quái vật, cây cối, công trình và vật phẩm là các tấm hình 2D phẳng đứng thẳng dạng "Paper Cutout", tự xoay mặt về camera theo trục Y - Cylindrical Billboarding, có bóng đổ dẹt trên nền đất 3D).
 * **Chủ đề Game Jam:** Endless Ocean (Đại dương Vô Tận)
 * **Thử thách áp dụng (Bonus Challenges):**
   - [x] **1. Non-Euclidean Space:** Các cánh cửa trên các hòn đảo dẫn đến những căn phòng có kích thước hoặc vị trí phi lý.
@@ -88,8 +88,13 @@ https://itch.io/jam/month-of-horror-3
 ---
 
 ## 6. Phong cách Nghe - Nhìn (Art & Audio Direction)
-* **Hình ảnh (Art Style): MS Paint 2D Horror x 3D Atmospheric Void**
-  * **Phong cách 2D:** Sử dụng các hình vẽ tay theo phong cách **MS Paint** (nét vẽ nguệch ngoạc, thô ráp, tối giản, mang hơi hướng liminal/analog horror kỳ dị giống các tựa game cult classic như *FAITH*, *World of Horror*, *Baldi's Basics*).
+* **Hình ảnh (Art Style): MS Paint 2D x Don't Starve Together 2.5D Render x 3D Void**
+  * **Cơ chế Render kiểu Don't Starve Together:**
+    * Các đối tượng 2D (nhân vật, thuyền, bia đá, đồ vật, quái vật) đứng thẳng tắp trên mặt đất 3D như những mảnh giấy bìa cứng (Paper Puppets).
+    * **Khóa trục Y (Y-Axis Lock Billboarding):** Sprite chỉ xoay ngang theo hướng camera để người chơi luôn nhìn thấy mặt trước, nhưng **không bị ngửa ra sau** theo góc nghiêng của camera, giữ trọn vẹn cảm giác "sách nổi 3D" (Pop-up book) đặc trưng của *Don't Starve*.
+    * **Lật hướng Sprite (Flip X):** Khi nhân vật/quái vật di chuyển sang trái/phải, sprite tự động lật mặt theo hướng đi.
+    * **Bóng đổ dẹt (Blob/Drop Shadow):** Dưới chân mỗi nhân vật/đồ vật có một đốm bóng đen hình bầu dục chiếu lên mặt đất/nước 3D, giúp định vị chính xác vị trí trong không gian ba chiều.
+  * **Phong cách 2D:** Nét vẽ tay MS Paint thô ráp, méo mó, tối giản, mang hơi hướng liminal/analog horror rợn người.
   * **Môi trường 3D:** Đại dương 3D đen ngòm, sương mù dày đặc (Volumetric Fog) và ánh sáng thể tích thời gian thực trong Unity 6 URP. Sự tương phản giữa nét vẽ MS Paint 2D thô sơ và không gian 3D u tối tạo nên cảm giác kinh dị siêu thực (uncanny/surreal horror) độc nhất vô nhị.
   * **Thiết lập Texture trong Unity:** Texture Type: `Sprite (2D and UI)`, Filter Mode: `Point (no filter)`, Compression: `None` để giữ nguyên độ sắc nét nguyên bản của nét vẽ Paint.
   * **Tuân thủ bản quyền:** 100% vẽ tay bởi người làm game, hoàn toàn không sử dụng Generative AI theo đúng quy định của Game Jam.
