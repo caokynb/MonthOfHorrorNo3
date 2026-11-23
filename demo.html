@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <title>Echoes of the Endless Deep - Prototype Demo</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body, html { width: 100%; height: 100%; overflow: hidden; background: #05070a; font-family: 'Courier New', Courier, monospace; color: #eee; user-select: none; }
+    canvas { display: block; width: 100vw; height: 100vh; image-rendering: pixelated; }
+    #ui-overlay {
+      position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+      pointer-events: none; display: flex; flex-direction: column; justify-content: space-between; padding: 24px;
+    }
+    .hud-box {
+      background: rgba(0, 0, 0, 0.7); border: 2px solid #555; padding: 12px 18px; border-radius: 4px;
+      font-size: 14px; text-shadow: 1px 1px 2px #000; max-width: 380px;
+    }
+    #prompt-display {
+      position: absolute; top: 38%; left: 50%; transform: translate(-50%, -50%);
+      font-size: 26px; font-weight: bold; text-align: center; color: #ff4444;
+      background: rgba(5, 5, 5, 0.85); border: 2px solid #aa2222; padding: 20px 30px;
+      border-radius: 6px; box-shadow: 0 0 30px rgba(255, 0, 0, 0.3);
+      opacity: 0; transition: opacity 1.2s ease; max-width: 650px; line-height: 1.4;
+    }
+    #start-screen {
+      position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+      background: #020305; display: flex; flex-direction: column; justify-content: center; align-items: center;
+      z-index: 100; cursor: pointer; text-align: center; padding: 20px;
+    }
+    #start-screen h1 { font-size: 34px; color: #eee; margin-bottom: 12px; letter-spacing: 3px; }
+    #start-screen p { font-size: 15px; color: #8899aa; max-width: 540px; line-height: 1.6; margin-bottom: 25px; }
+    .btn-start {
+      border: 2px solid #fff; padding: 14px 32px; font-size: 16px; background: transparent; color: #fff;
+      font-family: inherit; font-weight: bold; cursor: pointer; transition: all 0.2s;
+    }
+    .btn-start:hover { background: #fff; color: #000; }
+    #beacon-compass {
+      display: inline-block; width: 14px; height: 14px; border-radius: 50%; background: #44ffaa;
+      box-shadow: 0 0 10px #44ffaa; margin-right: 8px; vertical-align: middle;
+      animation: pulse 1.8s infinite;
+    }
+    @keyframes pulse { 0% { opacity: 0.3; transform: scale(0.9); } 50% { opacity: 1; transform: scale(1.15); } 100% { opacity: 0.3; transform: scale(0.9); } }
+  </style>
+</head>
+<body>
+
+<div id="start-screen" onclick="startGame()">
+  <h1>ECHOES OF THE ENDLESS DEEP</h1>
+  <p>Một cơn mơ hậu chia tay. Đại dương vô thức không bờ bến.<br>
+  Lái thuyền theo hướng âm thanh vọng lại từ các hòn đảo mang hình hài sai lầm của bạn.<br>
+  Càng đi xa, biển càng đen đặc, con thuyền càng khó lái, và kẻ theo dõi càng tiến lại gần.</p>
+  <button class="btn-start">[ NHẤN ĐỂ BẮT ĐẦU GIẤC MƠ ]</button>
+  <div style="margin-top: 25px; font-size: 13px; color: #556677;">
+    Phím: <b>W/A/S/D</b> hoặc <b>Mũi tên</b> để lái thuyền/đi bộ | <b>Chuột</b> để lia đèn | <b>E</b> để cập bến/tương tác
+  </div>
+</div>
+
+<div id="ui-overlay">
+  <div style="display: flex; justify-content: space-between;">
+    <div class="hud-box">
+      <div><b>TRẠNG THÁI:</b> <span id="hud-mode">Đang lái thuyền</span></div>
+      <div style="margin-top: 6px;"><span id="beacon-compass"></span><b>VỌNG ÂM:</b> <span id="hud-beacon">Đang lắng nghe...</span></div>
+      <div style="margin-top: 6px;"><b>TIẾN TRÌNH:</b> <span id="hud-progress">Đảo 1 / 7</span></div>
+    </div>
+    <div class="hud-box" style="text-align: right;">
+      <div><b>SỨC CẢN ĐẠI DƯƠNG:</b> <span id="hud-water" style="color: #66ff88;">Êm đềm</span></div>
+      <div style="margin-top: 6px;"><b>KẺ THEO DÕI:</b> <span id="hud-watcher" style="color: #888;">Ở rất xa</span></div>
+    </div>
+  </div>
+
+  <div id="prompt-display">
+    <div id="prompt-text">"Why didn't you smile?"</div>
+    <div style="font-size: 14px; font-weight: normal; color: #bbb; margin-top: 10px;">[ Nhấn E để trở lại thuyền và tiếp tục ]</div>
+  </div>
+
+  <div class="hud-box" style="align-self: center; text-align: center; max-width: 600px;">
+    <span id="hud-hint">Dùng W/A/S/D để lái thuyền. Lắng nghe tiếng âm thanh định hướng để tìm hòn đảo tiếp theo.</span>
+  </div>
+</div>
+
+<canvas id="gameCanvas"></canvas>
+
+<script>
+// --- AUDIO SYNTHESIZER (WEB AUDIO API - NO EXTERNAL FILES) ---
+class AudioController {
+  constructor() {
+    this.ctx = null;
+    this.ambientNoise = null;
+    this.ambientGain = null;
+    this.beaconOsc = null;
+    this.beaconGain = null;
+    this.beaconPanner = null;
+    this.heartbeatOsc = null;
+    this.heartbeatGain = null;
+    this.lastBeaconTime = 0;
+  }
+
+  init() {
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    this.ctx = new AudioContext();
+
+    // Ocean Ambient Noise (Pink noise approximation)
+    const bufferSize = this.ctx.sampleRate * 2;
+    const noiseBuffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+    const output = noiseBuffer.getChannelData(0);
+    let b0 = 0, b1 = 0, b2 = 0;
+    for (let i = 0; i < bufferSize; i++) {
+      const white = Math.random() * 2 - 1;
+      b0 = 0.99886 * b0 + white * 0.0555179;
+      b1 = 0.99332 * b1 + white * 0.0750759;
+      b2 = 0.96900 * b2 + white * 0.1538520;
+      output[i] = (b0 + b1 + b2) * 0.08;
+    }
+
+    const whiteNoise = this.ctx.createBufferSource();
+    whiteNoise.buffer = noiseBuffer;
+    whiteNoise.loop = true;
+
+    // Filter to make it sound like deep ocean waves
+    const filter = this.ctx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.value = 240;
+
+    this.ambientGain = this.ctx.createGain();
+    this.ambientGain.gain.value = 0.4;
+
+    whiteNoise.connect(filter);
+    filter.connect(this.ambientGain);
+    this.ambientGain.connect(this.ctx.destination);
+    whiteNoise.start();
+
+    // Stereo Panner for Beacon (if supported)
+    if (this.ctx.createStereoPanner) {
+      this.beaconPanner = this.ctx.createStereoPanner();
+      this.beaconPanner.connect(this.ctx.destination);
+    }
+  }
+
+  // Play spatial pulse towards target island
+  playBeaconPulse(angleOffset, distanceRatio, islandIndex) {
+    if (!this.ctx || this.ctx.state !== 'running') return;
+    const now = this.ctx.currentTime;
+    if (now - this.lastBeaconTime < 2.0) return;
+    this.lastBeaconTime = now;
+
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+
+    // Different eerie tone per island
+    const freqs = [330, 293, 261, 220, 196, 164, 130];
+    osc.frequency.setValueAtTime(freqs[islandIndex % freqs.length], now);
+    osc.type = islandIndex > 3 ? 'sawtooth' : 'sine';
+
+    // Volume based on distance (closer = louder)
+    const vol = Math.max(0.05, 0.45 * (1 - Math.min(distanceRatio, 0.95)));
+    gain.gain.setValueAtTime(0.001, now);
+    gain.gain.exponentialRampToValueAtTime(vol, now + 0.15);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 1.2);
+
+    if (this.beaconPanner) {
+      const pan = Math.sin(angleOffset);
+      this.beaconPanner.pan.setValueAtTime(Math.max(-1, Math.min(1, pan)), now);
+      osc.connect(gain);
+      gain.connect(this.beaconPanner);
+    } else {
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+    }
+
+    osc.start(now);
+    osc.stop(now + 1.3);
+  }
+
+  // Deep resonant chord when setting foot on island
+  playDiscoveryChime(islandIndex) {
+    if (!this.ctx) return;
+    const now = this.ctx.currentTime;
+    const chord = [110, 164.81, 196, 220];
+    chord.forEach((freq, idx) => {
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(freq * (1 - islandIndex * 0.05), now);
+      gain.gain.setValueAtTime(0.001, now);
+      gain.gain.linearRampToValueAtTime(0.2, now + 0.3 + idx * 0.1);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 3.0);
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+      osc.start(now);
+      osc.stop(now + 3.1);
+    });
+  }
+
+  // Heartbeat when watcher is close
+  playHeartbeat() {
+    if (!this.ctx) return;
+    const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(65, now);
+    osc.frequency.exponentialRampToValueAtTime(35, now + 0.12);
+    gain.gain.setValueAtTime(0.35, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+    osc.connect(gain);
+    gain.connect(this.ctx.destination);
+    osc.start(now);
+    osc.stop(now + 0.2);
+  }
+}
+
+// --- GAME DATA & CONFIGURATION ---
+const ISLANDS_CONFIG = [
+  {
+    name: "Why didn't you smile?",
+    sub: "Nụ cười gượng ép cuối cùng trước khi người ấy quay lưng.",
+    soundDesc: "Tiếng cười vang vọng chập chờn",
+    pos: { x: 300, y: -450 },
+    radius: 95,
+    drawProp: (ctx) => {
+      // MS Paint Doodle: Cracked Mirror with yellow forced smile
+      ctx.strokeStyle = '#fff'; ctx.lineWidth = 3;
+      ctx.strokeRect(-25, -40, 50, 70);
+      // Crack
+      ctx.beginPath(); ctx.moveTo(-15, -35); ctx.lineTo(5, 0); ctx.lineTo(-10, 25); ctx.stroke();
+      // Yellow Smiley
+      ctx.strokeStyle = '#ffdd44'; ctx.beginPath(); ctx.arc(0, -5, 16, 0, Math.PI * 2); ctx.stroke();
+      // Eyes
+      ctx.fillStyle = '#ffdd44'; ctx.fillRect(-7, -10, 3, 3); ctx.fillRect(4, -10, 3, 3);
+      // Forced curved mouth
+      ctx.beginPath(); ctx.arc(0, -3, 9, 0.1, Math.PI - 0.1); ctx.stroke();
+    }
+  },
+  {
+    name: "Did you deserve it?",
+    sub: "Sự tự ti: Người ta tốt thế, còn mình thì xứng đáng bị bỏ lại sao?",
+    soundDesc: "Tiếng thì thầm tự vấn đứt quãng",
+    pos: { x: 850, y: -900 },
+    radius: 110,
+    drawProp: (ctx) => {
+      // MS Paint Doodle: Broken chair & unwrapped ripped gift
+      ctx.strokeStyle = '#fff'; ctx.lineWidth = 3;
+      // Broken chair
+      ctx.strokeRect(-25, -15, 20, 25);
+      ctx.beginPath(); ctx.moveTo(-25, -15); ctx.lineTo(-25, -45); ctx.stroke();
+      // Broken leg
+      ctx.beginPath(); ctx.moveTo(-5, 10); ctx.lineTo(10, 20); ctx.stroke();
+      // Torn gift
+      ctx.strokeStyle = '#ff4444';
+      ctx.strokeRect(15, -5, 25, 25);
+      ctx.beginPath(); ctx.moveTo(15, -5); ctx.lineTo(40, 20); ctx.stroke();
+    }
+  },
+  {
+    name: "You were just lucky.",
+    sub: "Imposter Syndrome: Tự nhủ rằng mình chỉ là kẻ ăn may, chưa từng đủ giỏi.",
+    soundDesc: "Tiếng xúc xắc lăn lách cách",
+    pos: { x: 1600, y: -700 },
+    radius: 125,
+    drawProp: (ctx) => {
+      // MS Paint Doodle: Shattered giant die with only 1 dot
+      ctx.strokeStyle = '#eee'; ctx.lineWidth = 3;
+      ctx.strokeRect(-30, -30, 60, 60);
+      // Red single dot
+      ctx.fillStyle = '#ff2222'; ctx.beginPath(); ctx.arc(0, 0, 8, 0, Math.PI*2); ctx.fill();
+      // Red X cross
+      ctx.strokeStyle = '#ff2222'; ctx.lineWidth = 4;
+      ctx.beginPath(); ctx.moveTo(-35, -35); ctx.lineTo(35, 35); ctx.stroke();
+    }
+  },
+  {
+    name: "Why are you crying?",
+    sub: "Cơn nấc nghẹn trong phòng tối: Tự trách vì đã yếu đuối không thể ngừng rơi lệ.",
+    soundDesc: "Tiếng giọt nước mắt rơi lộp độp",
+    pos: { x: 2200, y: -1300 },
+    radius: 130,
+    drawProp: (ctx) => {
+      // MS Paint Doodle: Inside-out soaked black umbrella
+      ctx.strokeStyle = '#77aaff'; ctx.lineWidth = 3;
+      // Inverted umbrella
+      ctx.beginPath(); ctx.arc(0, 15, 30, Math.PI, 0); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0, 15); ctx.lineTo(0, -35); ctx.lineTo(-8, -42); ctx.stroke();
+      // Teardrops
+      ctx.fillStyle = '#77aaff';
+      ctx.fillRect(-15, -5, 3, 7); ctx.fillRect(12, -10, 3, 7); ctx.fillRect(0, 25, 4, 8);
+    }
+  },
+  {
+    name: "You caused all of this.",
+    sub: "Dằn vặt: Chính sự giận dữ và lời nói của mình đã phá hủy tất cả.",
+    soundDesc: "Tiếng kim loại cào vào đáy thuyền",
+    pos: { x: 1800, y: -2200 },
+    radius: 140,
+    drawProp: (ctx) => {
+      // MS Paint Doodle: A freestanding door with cracked void inside
+      ctx.strokeStyle = '#ff5533'; ctx.lineWidth = 4;
+      ctx.strokeRect(-25, -55, 50, 95);
+      // Shattered glass
+      ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(-20, -50); ctx.lineTo(15, 0); ctx.lineTo(-10, 35); ctx.stroke();
+      // Doorknob
+      ctx.fillStyle = '#ffdd44'; ctx.fillRect(15, -5, 5, 5);
+    }
+  },
+  {
+    name: "You never tried.",
+    sub: "Lời kết án cay đắng: Mày là kẻ bỏ cuộc, chưa từng cố gắng vì tình yêu này.",
+    soundDesc: "Tiếng đồng hồ cát chảy ngược",
+    pos: { x: 900, y: -2500 },
+    radius: 145,
+    drawProp: (ctx) => {
+      // MS Paint Doodle: Hourglass and abandoned unopened letter
+      ctx.strokeStyle = '#eee'; ctx.lineWidth = 3;
+      // Hourglass
+      ctx.beginPath(); ctx.moveTo(-20, -40); ctx.lineTo(20, -40); ctx.lineTo(-20, 10); ctx.lineTo(20, 10); ctx.closePath(); ctx.stroke();
+      // Letter
+      ctx.strokeStyle = '#ffdd44'; ctx.strokeRect(-30, 20, 60, 35);
+      ctx.beginPath(); ctx.moveTo(-30, 20); ctx.lineTo(0, 38); ctx.lineTo(30, 20); ctx.stroke();
+    }
+  },
+  {
+    name: "It's all your fault.",
+    sub: "Đáy vực sâu nhất: Đối mặt với chính mình và chọn tha thứ hay tiếp tục chìm đắm.",
+    soundDesc: "Tiếng tim đập dồn dập giữa tâm bão",
+    pos: { x: 0, y: -2900 },
+    radius: 170,
+    drawProp: (ctx) => {
+      // MS Paint Doodle: Monolith silhouette of the player pointing at mirror
+      ctx.strokeStyle = '#ff2222'; ctx.lineWidth = 4;
+      ctx.strokeRect(-35, -70, 70, 130);
+      ctx.fillStyle = '#ff2222';
+      ctx.font = '16px monospace';
+      ctx.fillText("FORGIVE?", -32, 0);
+    }
+  }
+];
+
+// --- MAIN ENGINE & STATE ---
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+let audio = new AudioController();
+let gameRunning = false;
+
+function resize() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+}
+window.addEventListener('resize', resize);
+resize();
+
+// Input Tracking
+const keys = {};
+let mousePos = { x: canvas.width / 2, y: canvas.height / 2 };
+window.addEventListener('keydown', e => { keys[e.key.toLowerCase()] = true; });
+window.addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
+window.addEventListener('mousemove', e => { mousePos.x = e.clientX; mousePos.y = e.clientY; });
+
+// Game State
+const state = {
+  currentIslandIndex: 0,
+  mode: 'SAILING', // 'SAILING' or 'ON_FOOT'
+  boat: {
+    x: 0, y: 0,
+    vx: 0, vy: 0,
+    angle: 0,
+    rotSpeed: 0.045,
+    accel: 0.16,
+    friction: 0.985
+  },
+  player: {
+    x: 0, y: 0,
+    speed: 2.2,
+    angle: 0
+  },
+  camera: { x: 0, y: 0 },
+  watcher: {
+    active: false,
+    x: 0, y: 0,
+    visibleTime: 0
+  },
+  waves: [],
+  onIslandCooldown: 0,
+  promptShowing: false
+};
+
+// Spawn background ambient water particles
+for (let i = 0; i < 90; i++) {
+  state.waves.push({
+    x: (Math.random() - 0.5) * 4000,
+    y: (Math.random() - 0.5) * 4000,
+    size: Math.random() * 14 + 6,
+    speed: Math.random() * 0.4 + 0.2,
+    phase: Math.random() * Math.PI * 2
+  });
+}
+
+function startGame() {
+  document.getElementById('start-screen').style.display = 'none';
+  audio.init();
+  gameRunning = true;
+  requestAnimationFrame(gameLoop);
+}
+
+// --- UPDATE LOOP ---
+function update() {
+  const curIsland = ISLANDS_CONFIG[state.currentIslandIndex];
+  const progressRatio = state.currentIslandIndex / (ISLANDS_CONFIG.length - 1);
+
+  // Difficulty / Sluggishness escalation:
+  // Water friction increases, boat acceleration drops!
+  const sluggishFactor = 1 - (progressRatio * 0.45);
+  const currentFriction = state.boat.friction - (progressRatio * 0.015);
+  const currentRotSpeed = state.boat.rotSpeed * sluggishFactor;
+
+  // 1. Boat Movement
+  if (state.mode === 'SAILING') {
+    if (keys['w'] || keys['arrowup']) {
+      state.boat.vx += Math.cos(state.boat.angle) * state.boat.accel * sluggishFactor;
+      state.boat.vy += Math.sin(state.boat.angle) * state.boat.accel * sluggishFactor;
+    }
+    if (keys['s'] || keys['arrowdown']) {
+      state.boat.vx -= Math.cos(state.boat.angle) * (state.boat.accel * 0.5) * sluggishFactor;
+      state.boat.vy -= Math.sin(state.boat.angle) * (state.boat.accel * 0.5) * sluggishFactor;
+    }
+    if (keys['a'] || keys['arrowleft']) {
+      state.boat.angle -= currentRotSpeed;
+    }
+    if (keys['d'] || keys['arrowright']) {
+      state.boat.angle += currentRotSpeed;
+    }
+
+    state.boat.vx *= currentFriction;
+    state.boat.vy *= currentFriction;
+    state.boat.x += state.boat.vx;
+    state.boat.y += state.boat.vy;
+
+    state.player.x = state.boat.x;
+    state.player.y = state.boat.y;
+    state.camera.x += (state.boat.x - state.camera.x) * 0.08;
+    state.camera.y += (state.boat.y - state.camera.y) * 0.08;
+  } 
+  // 2. On-Foot Movement (On Island)
+  else {
+    let dx = 0, dy = 0;
+    if (keys['w'] || keys['arrowup']) dy -= 1;
+    if (keys['s'] || keys['arrowdown']) dy += 1;
+    if (keys['a'] || keys['arrowleft']) dx -= 1;
+    if (keys['d'] || keys['arrowright']) dx += 1;
+
+    if (dx !== 0 || dy !== 0) {
+      const len = Math.hypot(dx, dy);
+      state.player.x += (dx / len) * state.player.speed;
+      state.player.y += (dy / len) * state.player.speed;
+    }
+
+    // Keep player within island radius
+    const distToCenter = Math.hypot(state.player.x - curIsland.pos.x, state.player.y - curIsland.pos.y);
+    if (distToCenter > curIsland.radius - 8) {
+      const ang = Math.atan2(state.player.y - curIsland.pos.y, state.player.x - curIsland.pos.x);
+      state.player.x = curIsland.pos.x + Math.cos(ang) * (curIsland.radius - 8);
+      state.player.y = curIsland.pos.y + Math.sin(ang) * (curIsland.radius - 8);
+    }
+
+    state.camera.x += (state.player.x - state.camera.x) * 0.08;
+    state.camera.y += (state.player.y - state.camera.y) * 0.08;
+  }
+
+  // Check Island Interaction
+  const distToCurIsland = Math.hypot(state.boat.x - curIsland.pos.x, state.boat.y - curIsland.pos.y);
+
+  if (state.mode === 'SAILING' && distToCurIsland < curIsland.radius + 15) {
+    document.getElementById('hud-hint').innerHTML = "<b style='color:#ffff44;'>[NHẤN E] ĐỂ CẬP BẾN HÒN ĐẢO NÀY</b>";
+    if (keys['e'] && state.onIslandCooldown <= 0) {
+      state.mode = 'ON_FOOT';
+      state.onIslandCooldown = 30;
+      audio.playDiscoveryChime(state.currentIslandIndex);
+      showPrompt(curIsland.name, curIsland.sub);
+    }
+  } else if (state.mode === 'ON_FOOT') {
+    if (keys['e'] && state.onIslandCooldown <= 0 && state.promptShowing) {
+      hidePrompt();
+      state.mode = 'SAILING';
+      state.onIslandCooldown = 40;
+      // Move to next island!
+      if (state.currentIslandIndex < ISLANDS_CONFIG.length - 1) {
+        state.currentIslandIndex++;
+      } else {
+        // Ending reached
+        alert("BẠN ĐÃ THỨC TỈNH KHỎI CƠN MƠ.\n\nNhận ra rằng một mối quan hệ đổ vỡ không phải là dấu chấm hết cho giá trị của bạn.\nBạn quyết định tha thứ cho chính mình và bước tiếp.");
+        window.location.reload();
+      }
+    }
+  } else {
+    document.getElementById('hud-hint').innerHTML = state.mode === 'SAILING' 
+      ? "Lái thuyền theo âm thanh định hướng. Tránh bóng tối vô thức."
+      : "Đi lại trên đảo bằng W/A/S/D. Nhấn E để trở lại thuyền.";
+  }
+
+  if (state.onIslandCooldown > 0) state.onIslandCooldown--;
+
+  // Spatial Beacon Audio Update
+  const angleToIsland = Math.atan2(curIsland.pos.y - state.boat.y, curIsland.pos.x - state.boat.x);
+  const angleOffset = angleToIsland - state.boat.angle;
+  audio.playBeaconPulse(angleOffset, distToCurIsland / 2000, state.currentIslandIndex);
+
+  // Watcher Appearance Logic (escalates with progress)
+  if (state.currentIslandIndex >= 2 && Math.random() < 0.008 && !state.watcher.active) {
+    state.watcher.active = true;
+    const watchAng = Math.random() * Math.PI * 2;
+    const watchDist = 220 + Math.random() * 80;
+    state.watcher.x = (state.mode === 'SAILING' ? state.boat.x : state.player.x) + Math.cos(watchAng) * watchDist;
+    state.watcher.y = (state.mode === 'SAILING' ? state.boat.y : state.player.y) + Math.sin(watchAng) * watchDist;
+    state.watcher.visibleTime = 160;
+    audio.playHeartbeat();
+  }
+  if (state.watcher.active) {
+    state.watcher.visibleTime--;
+    if (state.watcher.visibleTime <= 0) state.watcher.active = false;
+  }
+
+  // Update HUD
+  document.getElementById('hud-mode').innerText = state.mode === 'SAILING' ? "Đang lái thuyền" : "Khám phá trên đảo";
+  document.getElementById('hud-beacon').innerText = curIsland.soundDesc;
+  document.getElementById('hud-progress').innerText = `Đảo ${state.currentIslandIndex + 1} / 7: "${curIsland.name}"`;
+  
+  const waterStates = ["Êm đềm", "Bắt đầu dậy sóng", "Xám đục & nặng nề", "Sương mù lạnh buốt", "Đen đặc như dầu", "Dòng nước cản dữ dội", "Tâm bão vô thức"];
+  document.getElementById('hud-water').innerText = waterStates[state.currentIslandIndex];
+  document.getElementById('hud-water').style.color = state.currentIslandIndex > 4 ? '#ff4444' : (state.currentIslandIndex > 2 ? '#ffaa44' : '#66ff88');
+
+  const watcherDistances = ["Chưa xuất hiện", "Rất xa trong sương", "Đang dõi theo từ xa", "Thấp thoáng rìa tầm nhìn", "Lập lờ dưới mạn thuyền", "Đứng ngay cạnh bạn", "ÁP SÁT BẠN"];
+  document.getElementById('hud-watcher').innerText = watcherDistances[state.currentIslandIndex];
+  document.getElementById('hud-watcher').style.color = state.currentIslandIndex > 3 ? '#ff3333' : '#888';
+}
+
+function showPrompt(title, sub) {
+  state.promptShowing = true;
+  const el = document.getElementById('prompt-display');
+  // Ambiguous & raw: No explanation, just the chilling words lingering in the darkness
+  document.getElementById('prompt-text').innerHTML = `"${title}"`;
+  el.style.opacity = '1';
+}
+
+function hidePrompt() {
+  state.promptShowing = false;
+  document.getElementById('prompt-display').style.opacity = '0';
+}
+
+// --- RENDER LOOP ---
+function draw() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  const cx = canvas.width / 2;
+  const cy = canvas.height / 2;
+  const camX = state.camera.x;
+  const camY = state.camera.y;
+  const progressRatio = state.currentIslandIndex / (ISLANDS_CONFIG.length - 1);
+
+  // 1. Draw Deep Ocean Water
+  const waterTone = Math.max(2, Math.floor(10 - progressRatio * 7));
+  ctx.fillStyle = `rgb(${waterTone-1}, ${waterTone}, ${waterTone + 3})`;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // Draw Wave ripples (MS Paint crude doodles)
+  ctx.strokeStyle = `rgba(255, 255, 255, ${Math.max(0.04, 0.15 - progressRatio * 0.1)})`;
+  ctx.lineWidth = 1.5;
+  state.waves.forEach(w => {
+    const wx = w.x - camX + cx;
+    const wy = w.y - camY + cy;
+    if (wx > -50 && wx < canvas.width + 50 && wy > -50 && wy < canvas.height + 50) {
+      ctx.beginPath();
+      ctx.moveTo(wx - w.size, wy);
+      ctx.quadraticCurveTo(wx, wy - 3, wx + w.size, wy);
+      ctx.stroke();
+    }
+  });
+
+  // 2. Draw Islands
+  ISLANDS_CONFIG.forEach((isl, idx) => {
+    const ix = isl.pos.x - camX + cx;
+    const iy = isl.pos.y - camY + cy;
+    if (ix > -300 && ix < canvas.width + 300 && iy > -300 && iy < canvas.height + 300) {
+      // Crude MS Paint island contour
+      ctx.fillStyle = idx === state.currentIslandIndex ? '#1a1d24' : '#0e1014';
+      ctx.strokeStyle = idx === state.currentIslandIndex ? '#ffffff' : '#444444';
+      ctx.lineWidth = 3;
+
+      ctx.beginPath();
+      // Draw irregular jagged rock circle
+      const steps = 14;
+      for (let s = 0; s <= steps; s++) {
+        const a = (s / steps) * Math.PI * 2;
+        const r = isl.radius + (Math.sin(s * 2.5) * 8);
+        const px = ix + Math.cos(a) * r;
+        const py = iy + Math.sin(a) * r;
+        if (s === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      // Draw MS Paint Props on Island
+      ctx.save();
+      ctx.translate(ix, iy);
+      isl.drawProp(ctx);
+      ctx.restore();
+
+      // Number badge
+      ctx.fillStyle = '#ff4444';
+      ctx.font = 'bold 16px Courier New';
+      ctx.fillText(`#${idx+1}`, ix - 10, iy - isl.radius - 12);
+    }
+  });
+
+  // 3. Draw The Watcher (Eerie MS Paint Silhouette)
+  if (state.watcher.active) {
+    const wx = state.watcher.x - camX + cx;
+    const wy = state.watcher.y - camY + cy;
+    ctx.save();
+    ctx.translate(wx, wy);
+    // Tall slender black figure
+    ctx.fillStyle = '#000000';
+    ctx.fillRect(-8, -45, 16, 50);
+    ctx.beginPath(); ctx.arc(0, -52, 9, 0, Math.PI * 2); ctx.fill();
+    // Staring blank white eyes (MS Paint dot)
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(-4, -54, 2.5, 3);
+    ctx.fillRect(2, -54, 2.5, 3);
+    ctx.restore();
+  }
+
+  // 4. Draw Boat
+  const bx = state.boat.x - camX + cx;
+  const by = state.boat.y - camY + cy;
+  ctx.save();
+  ctx.translate(bx, by);
+  ctx.rotate(state.boat.angle);
+
+  // MS Paint crude boat hull
+  ctx.fillStyle = '#1c1612';
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(30, 0); // bow tip
+  ctx.lineTo(-20, 16);
+  ctx.lineTo(-26, 0);
+  ctx.lineTo(-20, -16);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  // Boat bench / seat
+  ctx.strokeStyle = '#aa7744';
+  ctx.strokeRect(-8, -12, 6, 24);
+
+  // Lantern on bow
+  ctx.fillStyle = '#ffdd44';
+  ctx.beginPath(); ctx.arc(24, 0, 4, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+
+  // 5. Draw Player Character (when ON_FOOT)
+  if (state.mode === 'ON_FOOT') {
+    const px = state.player.x - camX + cx;
+    const py = state.player.y - camY + cy;
+    ctx.save();
+    ctx.translate(px, py);
+
+    // Crude MS Paint Character
+    ctx.fillStyle = '#eeeeee';
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 2.5;
+
+    // Body
+    ctx.strokeRect(-6, -14, 12, 18);
+    // Head
+    ctx.beginPath(); ctx.arc(0, -20, 7, 0, Math.PI * 2); ctx.stroke();
+    // Lantern in hand
+    const aimAngle = Math.atan2(mousePos.y - py, mousePos.x - px);
+    const lx = Math.cos(aimAngle) * 14;
+    const ly = Math.sin(aimAngle) * 14;
+    ctx.fillStyle = '#ffdd44';
+    ctx.beginPath(); ctx.arc(lx, ly, 4, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
+
+  // 6. DARKNESS & FLASHLIGHT CONE MASK (Vignette & Fog of War)
+  const focalX = state.mode === 'SAILING' ? bx : (state.player.x - camX + cx);
+  const focalY = state.mode === 'SAILING' ? by : (state.player.y - camY + cy);
+  const focalAngle = state.mode === 'SAILING' ? state.boat.angle : Math.atan2(mousePos.y - focalY, mousePos.x - focalX);
+
+  // Lantern light radius shrinks as progress increases!
+  const baseLanternRadius = Math.max(160, 310 - progressRatio * 130);
+
+  ctx.save();
+  // Cutout darkness
+  const darkCanvas = document.createElement('canvas');
+  darkCanvas.width = canvas.width;
+  darkCanvas.height = canvas.height;
+  const dCtx = darkCanvas.getContext('2d');
+
+  // Fill pitch black
+  dCtx.fillStyle = 'rgba(2, 3, 5, 0.96)';
+  dCtx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // Punch hole for 360 ambient lantern
+  dCtx.globalCompositeOperation = 'destination-out';
+  const radGrad = dCtx.createRadialGradient(focalX, focalY, 15, focalX, focalY, baseLanternRadius * 0.45);
+  radGrad.addColorStop(0, 'rgba(0,0,0,1)');
+  radGrad.addColorStop(1, 'rgba(0,0,0,0)');
+  dCtx.fillStyle = radGrad;
+  dCtx.beginPath(); dCtx.arc(focalX, focalY, baseLanternRadius * 0.45, 0, Math.PI * 2); dCtx.fill();
+
+  // Punch hole for forward light cone
+  const coneGrad = dCtx.createRadialGradient(focalX, focalY, 20, focalX, focalY, baseLanternRadius);
+  coneGrad.addColorStop(0, 'rgba(0,0,0,1)');
+  coneGrad.addColorStop(0.8, 'rgba(0,0,0,0.85)');
+  coneGrad.addColorStop(1, 'rgba(0,0,0,0)');
+  dCtx.fillStyle = coneGrad;
+  dCtx.beginPath();
+  dCtx.moveTo(focalX, focalY);
+  dCtx.arc(focalX, focalY, baseLanternRadius, focalAngle - 0.55, focalAngle + 0.55);
+  dCtx.closePath();
+  dCtx.fill();
+
+  ctx.drawImage(darkCanvas, 0, 0);
+  ctx.restore();
+
+  // 7. Audio Directional Wave Cue (Subtle green/yellow beacon ring)
+  const curIsl = ISLANDS_CONFIG[state.currentIslandIndex];
+  const ang = Math.atan2(curIsl.pos.y - (camY - cy), curIsl.pos.x - (camX - cx));
+  ctx.save();
+  ctx.translate(focalX, focalY);
+  ctx.rotate(ang);
+  ctx.strokeStyle = 'rgba(68, 255, 170, 0.25)';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(0, 0, 55, -0.4, 0.4);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function gameLoop() {
+  if (!gameRunning) return;
+  update();
+  draw();
+  requestAnimationFrame(gameLoop);
+}
+</script>
+
+</body>
+</html>
