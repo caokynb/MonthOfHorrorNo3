@@ -66,19 +66,22 @@ namespace EchoesOfTheDeep.Controllers
         {
             Vector3 moveDirection = new Vector3(_inputVector.x, 0f, _inputVector.y);
 
-            if (_characterController.isGrounded)
+            if (_characterController != null && _characterController.enabled)
             {
-                _movementVelocity.y = -0.5f;
-            }
-            else
-            {
-                _movementVelocity.y -= _gravity * Time.deltaTime;
-            }
+                if (_characterController.isGrounded)
+                {
+                    _movementVelocity.y = -0.5f;
+                }
+                else
+                {
+                    _movementVelocity.y -= _gravity * Time.deltaTime;
+                }
 
-            Vector3 finalMove = moveDirection * _moveSpeed;
-            finalMove.y = _movementVelocity.y;
+                Vector3 finalMove = moveDirection * _moveSpeed;
+                finalMove.y = _movementVelocity.y;
 
-            _characterController.Move(finalMove * Time.deltaTime);
+                _characterController.Move(finalMove * Time.deltaTime);
+            }
 
             if (moveDirection.sqrMagnitude > 0.001f)
             {
@@ -96,11 +99,50 @@ namespace EchoesOfTheDeep.Controllers
             }
         }
 
+        public void AttachToBoat(Transform boatTransform, Vector3 localOffset)
+        {
+            SetControl(false);
+            if (_characterController == null) _characterController = GetComponent<CharacterController>();
+            if (_characterController != null)
+            {
+                _characterController.enabled = false;
+            }
+
+            transform.SetParent(boatTransform);
+            transform.localPosition = localOffset;
+            transform.localRotation = Quaternion.identity;
+        }
+
+        public void DetachFromBoat(Vector3 worldLandingPos)
+        {
+            transform.SetParent(null);
+            if (_characterController == null) _characterController = GetComponent<CharacterController>();
+            if (_characterController != null)
+            {
+                _characterController.enabled = false;
+                transform.position = worldLandingPos;
+                _characterController.enabled = true;
+            }
+            else
+            {
+                transform.position = worldLandingPos;
+            }
+            SetControl(true);
+        }
+
         public void TeleportTo(Vector3 worldPosition)
         {
-            _characterController.enabled = false;
-            transform.position = worldPosition;
-            _characterController.enabled = true;
+            if (_characterController == null) _characterController = GetComponent<CharacterController>();
+            if (_characterController != null)
+            {
+                _characterController.enabled = false;
+                transform.position = worldPosition;
+                _characterController.enabled = true;
+            }
+            else
+            {
+                transform.position = worldPosition;
+            }
         }
     }
 }

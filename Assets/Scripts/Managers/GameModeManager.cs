@@ -13,6 +13,12 @@ namespace EchoesOfTheDeep.Managers
         [SerializeField] private ShipController _shipController;
         [SerializeField] private PlayerCharacterController _playerController;
 
+        [Header("Boat Passenger")]
+        [Tooltip("Local position offset for the player when standing on the boat deck.")]
+        [SerializeField] private Vector3 _playerStandingOffsetOnBoat = new Vector3(0f, 0.4f, 0f);
+        [Tooltip("Optional custom standing transform point on the boat.")]
+        [SerializeField] private Transform _boatStandingPoint;
+
         [Header("Camera Tracking")]
         [SerializeField] private CinemachineCamera _cinemachineCamera;
         [SerializeField] private TopDownCameraFollow _fallbackCameraFollow;
@@ -54,10 +60,21 @@ namespace EchoesOfTheDeep.Managers
 
             if (_currentMode == GameMode.Sailing)
             {
+                Vector3 standingOffset = _boatStandingPoint != null 
+                    ? _boatStandingPoint.localPosition 
+                    : _playerStandingOffsetOnBoat;
+
                 if (_playerController != null)
                 {
-                    _playerController.SetControl(false);
-                    _playerController.gameObject.SetActive(false);
+                    if (_shipController != null)
+                    {
+                        _playerController.AttachToBoat(_shipController.transform, standingOffset);
+                    }
+                    else
+                    {
+                        _playerController.SetControl(false);
+                    }
+                    _playerController.gameObject.SetActive(true);
                 }
 
                 if (_shipController != null)
@@ -75,9 +92,8 @@ namespace EchoesOfTheDeep.Managers
 
                 if (_playerController != null)
                 {
+                    _playerController.DetachFromBoat(playerSpawnPos);
                     _playerController.gameObject.SetActive(true);
-                    _playerController.TeleportTo(playerSpawnPos);
-                    _playerController.SetControl(true);
                     UpdateCameraTarget(_playerController.transform);
                 }
             }

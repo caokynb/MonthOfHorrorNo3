@@ -5,7 +5,16 @@ namespace EchoesOfTheDeep.Rendering
     [ExecuteAlways]
     public class BillboardSprite : MonoBehaviour
     {
-        [SerializeField] private bool _lockYAxisOnly = true;
+        [Header("Billboard Alignment")]
+        [Tooltip("If true, the sprite matches camera tilt directly so it never snaps upright.")]
+        [SerializeField] private bool _matchCameraTilt = true;
+
+        [Tooltip("Lock to vertical Y-axis only (90 degrees to ground, like classic Doom/Mario Kart).")]
+        [SerializeField] private bool _lockYAxisOnly = false;
+
+        [Header("Custom Tilt Adjustment")]
+        [Tooltip("Additional manual tilt offset in degrees.")]
+        [SerializeField] private float _tiltOffsetAngle = 0f;
 
         private Camera _mainCamera;
 
@@ -22,16 +31,32 @@ namespace EchoesOfTheDeep.Rendering
                 if (_mainCamera == null) return;
             }
 
-            Vector3 directionToCamera = _mainCamera.transform.position - transform.position;
-
-            if (_lockYAxisOnly)
+            if (_matchCameraTilt)
             {
-                directionToCamera.y = 0f;
+                // Match camera view direction completely so the sprite never snaps or distorts
+                transform.rotation = _mainCamera.transform.rotation;
+                if (Mathf.Abs(_tiltOffsetAngle) > 0.01f)
+                {
+                    transform.Rotate(Vector3.right, _tiltOffsetAngle, Space.Self);
+                }
             }
-
-            if (directionToCamera.sqrMagnitude > 0.001f)
+            else
             {
-                transform.rotation = Quaternion.LookRotation(-directionToCamera);
+                Vector3 directionToCamera = _mainCamera.transform.position - transform.position;
+
+                if (_lockYAxisOnly)
+                {
+                    directionToCamera.y = 0f;
+                }
+
+                if (directionToCamera.sqrMagnitude > 0.001f)
+                {
+                    transform.rotation = Quaternion.LookRotation(-directionToCamera);
+                    if (Mathf.Abs(_tiltOffsetAngle) > 0.01f)
+                    {
+                        transform.Rotate(Vector3.right, _tiltOffsetAngle, Space.Self);
+                    }
+                }
             }
         }
     }
