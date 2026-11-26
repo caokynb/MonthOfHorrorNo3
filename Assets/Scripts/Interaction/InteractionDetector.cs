@@ -30,6 +30,15 @@ namespace EchoesOfTheDeep.Interaction
         private void OnDisable()
         {
             if (_interactAction != null) _interactAction.action.Disable();
+            if (_currentInteractable != null)
+            {
+                if (_currentInteractable is IInteractableFocus focus)
+                {
+                    focus.OnFocusLost();
+                }
+                _currentInteractable = null;
+                GameEvents.TriggerInteractionPromptCleared();
+            }
         }
 
         private void Update()
@@ -59,8 +68,10 @@ namespace EchoesOfTheDeep.Interaction
                 {
                     Vector3 targetPos = col.ClosestPoint(transform.position);
                     float distSqr = (targetPos - transform.position).sqrMagnitude;
+                    // Prefer trigger item colliders when distance ties (e.g. player standing on island ground collider)
+                    bool preferTie = col.isTrigger && Mathf.Abs(distSqr - closestDistanceSqr) < 0.05f;
 
-                    if (distSqr < closestDistanceSqr)
+                    if (distSqr < closestDistanceSqr || preferTie)
                     {
                         closestDistanceSqr = distSqr;
                         closestInteractable = interactable;
@@ -70,8 +81,19 @@ namespace EchoesOfTheDeep.Interaction
 
             if (closestInteractable != _currentInteractable)
             {
+                if (_currentInteractable is IInteractableFocus oldFocus)
+                {
+                    oldFocus.OnFocusLost();
+                }
+
                 _currentInteractable = closestInteractable;
-                if (_currentInteractable != null)
+
+                if (_currentInteractable is IInteractableFocus newFocus)
+                {
+                    newFocus.OnFocusGained();
+                }
+
+                if (_currentInteractable != null && !string.IsNullOrEmpty(_currentInteractable.InteractionPrompt))
                 {
                     GameEvents.TriggerInteractionPromptChanged(_currentInteractable.InteractionPrompt);
                 }
@@ -105,6 +127,7 @@ namespace EchoesOfTheDeep.Interaction
         private void OnGUI()
         {
             if (!_showOnGuiPrompt || _currentInteractable == null) return;
+            if (string.IsNullOrEmpty(_currentInteractable.InteractionPrompt)) return;
 
             GUIStyle style = new GUIStyle(GUI.skin.box)
             {

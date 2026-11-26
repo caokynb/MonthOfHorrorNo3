@@ -18,6 +18,7 @@ namespace EchoesOfTheDeep.Interaction
 
         [Header("Island Details")]
         [SerializeField] private int _islandIndex = 0;
+        [SerializeField] private bool _showNarrativeOnDock = false;
         [SerializeField] private string _islandPromptText = "\"Why didn't you smile?\"";
         [Tooltip("Thời gian hiển thị thông điệp cốt truyện (giây).")]
         [SerializeField] private float _narrativeDuration = 7f;
@@ -93,7 +94,11 @@ namespace EchoesOfTheDeep.Interaction
 
                 GameModeManager.Instance.SwitchToOnFoot(landingPos);
                 GameEvents.TriggerIslandReached(_islandIndex);
-                GameEvents.TriggerNarrativeDisplayed(_islandPromptText, _narrativeDuration);
+
+                if (_showNarrativeOnDock && !string.IsNullOrEmpty(_islandPromptText))
+                {
+                    GameEvents.TriggerNarrativeDisplayed(_islandPromptText, _narrativeDuration);
+                }
             }
             else
             {

@@ -2,6 +2,7 @@ using UnityEngine;
 using Unity.Cinemachine;
 using EchoesOfTheDeep.Core;
 using EchoesOfTheDeep.Controllers;
+using EchoesOfTheDeep.Interaction;
 
 namespace EchoesOfTheDeep.Managers
 {
@@ -66,6 +67,7 @@ namespace EchoesOfTheDeep.Managers
 
                 if (_playerController != null)
                 {
+                    SetInteractionDetectorEnabled(_playerController.gameObject, false);
                     if (_shipController != null)
                     {
                         _playerController.AttachToBoat(_shipController.transform, standingOffset);
@@ -80,6 +82,7 @@ namespace EchoesOfTheDeep.Managers
                 if (_shipController != null)
                 {
                     _shipController.SetControl(true);
+                    SetInteractionDetectorEnabled(_shipController.gameObject, true);
                     UpdateCameraTarget(_shipController.transform);
                 }
             }
@@ -88,17 +91,27 @@ namespace EchoesOfTheDeep.Managers
                 if (_shipController != null)
                 {
                     _shipController.SetControl(false);
+                    SetInteractionDetectorEnabled(_shipController.gameObject, false);
                 }
 
                 if (_playerController != null)
                 {
                     _playerController.DetachFromBoat(playerSpawnPos);
                     _playerController.gameObject.SetActive(true);
+                    SetInteractionDetectorEnabled(_playerController.gameObject, true);
                     UpdateCameraTarget(_playerController.transform);
                 }
             }
 
             GameEvents.TriggerGameModeChanged(_currentMode);
+        }
+
+        private void SetInteractionDetectorEnabled(GameObject target, bool enabled)
+        {
+            if (target != null && target.TryGetComponent<InteractionDetector>(out var detector))
+            {
+                detector.enabled = enabled;
+            }
         }
 
         private void UpdateCameraTarget(Transform target)

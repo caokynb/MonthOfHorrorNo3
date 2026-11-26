@@ -15,15 +15,22 @@ namespace EchoesOfTheDeep.Controllers
         [SerializeField] private InputActionReference _moveAction;
 
         private CharacterController _characterController;
+        private Collider[] _colliders;
         private Vector2 _inputVector;
         private Vector3 _movementVelocity;
         private bool _isControlled = false;
+
+        private Transform _attachedBoat;
+        private Vector3 _boatLocalOffset;
+        private Vector3 _defaultScale;
 
         public bool IsControlled => _isControlled;
 
         private void Awake()
         {
             _characterController = GetComponent<CharacterController>();
+            _colliders = GetComponents<Collider>();
+            _defaultScale = transform.localScale;
         }
 
         private void OnEnable()
@@ -42,6 +49,15 @@ namespace EchoesOfTheDeep.Controllers
 
             ReadInput();
             MoveCharacter();
+        }
+
+        private void LateUpdate()
+        {
+            if (_attachedBoat != null)
+            {
+                // Follow boat position without parenting to avoid non-uniform scale shear
+                transform.position = _attachedBoat.TransformPoint(_boatLocalOffset);
+            }
         }
 
         private void ReadInput()
@@ -102,32 +118,42 @@ namespace EchoesOfTheDeep.Controllers
         public void AttachToBoat(Transform boatTransform, Vector3 localOffset)
         {
             SetControl(false);
-            if (_characterController == null) _characterController = GetComponent<CharacterController>();
-            if (_characterController != null)
-            {
-                _characterController.enabled = false;
-            }
+            SetCollidersEnabled(false);
 
-            transform.SetParent(boatTransform);
-            transform.localPosition = localOffset;
-            transform.localRotation = Quaternion.identity;
+            transform.SetParent(null);
+            transform.localScale = _defaultScale;
+            transform.rotation = Quaternion.identity;
+
+            _attachedBoat = boatTransform;
+            _boatLocalOffset = localOffset;
+            if (_attachedBoat != null)
+            {
+                transform.position = _attachedBoat.TransformPoint(_boatLocalOffset);
+            }
         }
 
         public void DetachFromBoat(Vector3 worldLandingPos)
         {
+            _attachedBoat = null;
             transform.SetParent(null);
-            if (_characterController == null) _characterController = GetComponent<CharacterController>();
-            if (_characterController != null)
-            {
-                _characterController.enabled = false;
-                transform.position = worldLandingPos;
-                _characterController.enabled = true;
-            }
-            else
-            {
-                transform.position = worldLandingPos;
-            }
+            transform.localScale = _defaultScale;
+
+            SetCollidersEnabled(false);
+            transform.position = worldLandingPos;
+            SetCollidersEnabled(true);
             SetControl(true);
+        }
+
+        private void SetCollidersEnabled(bool enabled)
+        {
+            if (_colliders == null) _colliders = GetComponents<Collider>();
+            for (int i = 0; i < _colliders.Length; i++)
+            {
+                if (_colliders[i] != null)
+                {
+                    _colliders[i].enabled = enabled;
+                }
+            }
         }
 
         public void TeleportTo(Vector3 worldPosition)

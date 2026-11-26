@@ -16,6 +16,9 @@ namespace EchoesOfTheDeep.Core
         public static event Action<string> OnInteractionPromptChanged;
         public static event Action OnInteractionPromptCleared;
 
+        // Sự kiện hoàn thành ghép tờ giấy (trả về độ chính xác 0f -> 1f)
+        public static event Action<float> OnPaperAssembled;
+
         // Backward compatibility
         public static event Action<string> OnPromptDisplayed;
         public static event Action OnPromptCleared;
@@ -43,6 +46,11 @@ namespace EchoesOfTheDeep.Core
         public static void TriggerInteractionPromptCleared()
         {
             OnInteractionPromptCleared?.Invoke();
+        }
+
+        public static void TriggerPaperAssembled(float accuracy)
+        {
+            OnPaperAssembled?.Invoke(Mathf.Clamp01(accuracy));
         }
 
         public static void TriggerPromptDisplayed(string prompt) => OnPromptDisplayed?.Invoke(prompt);
